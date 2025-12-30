@@ -1,0 +1,353 @@
+trading-platform-go/
+├── README.md
+├── go.mod
+├── go.sum
+├── Makefile                         # (4) tooling targets: proto, lint, test, docker-build, run-*
+├── .gitignore
+├── .golangci.yml
+├── buf.yaml
+├── buf.gen.yaml
+├── tools.go                         # (4) pin tool versions: buf, mockgen, golangci-lint...
+
+├── docs/
+│   ├── architecture/
+│   │   ├── overview.md
+│   │   ├── principles.md
+│   │   └── adrs/
+│   │       ├── adr-0001-monorepo.md
+│   │       ├── adr-0002-events-protobuf.md
+│   │       ├── adr-0003-outbox.md
+│   │       ├── adr-0004-idempotency.md
+│   │       └── adr-0005-workflows.md
+│   └── runbooks/
+│       ├── local-dev.md
+│       ├── incident-kafka-lag.md
+│       ├── incident-db-locks.md
+│       └── incident-websocket.md
+
+├── api/
+│   └── proto/
+│       ├── common/v1/*.proto
+│       ├── marketdata/v1/*.proto
+│       ├── orders/v1/*.proto
+│       ├── accounts/v1/*.proto
+│       └── events/v1/*.proto
+
+├── cmd/
+│   ├── market-ingestor/
+│   │   ├── main.go
+│   │   ├── wire.go
+│   │   └── flags.go
+│   ├── stream-processor/
+│   │   ├── main.go
+│   │   ├── wire.go
+│   │   └── pipelines.go
+│   ├── history-writer/
+│   │   ├── main.go
+│   │   ├── wire.go
+│   │   └── consumers.go
+│   ├── realtime-gateway/
+│   │   ├── main.go
+│   │   ├── wire.go
+│   │   └── ws_routes.go
+│   └── api-gateway/
+│       ├── main.go
+│       ├── wire.go
+│       ├── http_routes.go
+│       └── grpc_routes.go
+
+├── internal/
+│   ├── sharedkernel/
+│   │   ├── money.go
+│   │   ├── symbol.go
+│   │   ├── ids.go
+│   │   ├── timerange.go
+│   │   └── errors.go
+
+│   ├── platform/
+│   │   ├── config/
+│   │   │   ├── config.go
+│   │   │   ├── loader.go
+│   │   │   └── secrets.go
+│   │
+│   │   ├── observability/
+│   │   │   ├── logger.go
+│   │   │   ├── metrics.go
+│   │   │   ├── tracing.go
+│   │   │   └── attributes.go
+│   │
+│   │   ├── runtime/
+│   │   │   ├── app.go
+│   │   │   ├── shutdown.go
+│   │   │   ├── worker_pool.go
+│   │   │   ├── backoff.go
+│   │   │   └── retry.go
+│   │
+│   │   ├── transport/
+│   │   │   ├── http/
+│   │   │   │   ├── server.go
+│   │   │   │   ├── responses.go
+│   │   │   │   └── middleware/
+│   │   │   │       ├── request_id.go
+│   │   │   │       ├── logging.go
+│   │   │   │       ├── recovery.go
+│   │   │   │       ├── auth.go
+│   │   │   │       └── ratelimit.go
+│   │   │   └── grpc/
+│   │   │       ├── server.go
+│   │   │       ├── interceptors.go
+│   │   │       └── errors.go
+│   │
+│   │   ├── storage/
+│   │   │   ├── postgres/
+│   │   │   │   ├── db.go
+│   │   │   │   ├── tx.go
+│   │   │   │   └── health.go
+│   │   │   └── redis/
+│   │   │       ├── client.go
+│   │   │       └── health.go
+│   │
+│   │   ├── errors/
+│   │   │   ├── errors.go
+│   │   │   ├── http.go
+│   │   │   └── grpc.go
+│   │
+│   │   ├── messaging/
+│   │   │   └── kafka/
+│   │   │       ├── producer.go
+│   │   │       ├── consumer.go
+│   │   │       ├── consumer_group.go
+│   │   │       ├── handler.go            # (2) handler interface + middleware chain
+│   │   │       ├── retry_policy.go       # (2) retry/backoff policy per error class
+│   │   │       ├── dlq.go                # (2) dead-letter queue publisher + conventions
+│   │   │       ├── topics.go
+│   │   │       ├── headers.go
+│   │   │       ├── codec.go
+│   │   │       └── codec_protobuf.go
+│   │
+│   │   ├── idempotency/
+│   │   │   ├── store.go
+│   │   │   ├── middleware.go
+│   │   │   └── keys.go
+│   │
+│   │   ├── outbox/
+│   │   │   ├── record.go
+│   │   │   ├── repository.go
+│   │   │   ├── relay.go
+│   │   │   ├── claimer.go              # (3) claim/lock batch (SKIP LOCKED)
+│   │   │   ├── publisher.go            # (3) idempotent publish wrapper (key = outbox_id)
+│   │   │   └── state_machine.go        # (3) NEW->PROCESSING->SENT/FAILED transitions
+│   │
+│   │   ├── workflow/                    # (1) workflow toolkit
+│   │   │   ├── step.go
+│   │   │   ├── runner.go
+│   │   │   ├── observed_runner.go       # (1) trace/metrics wrapper per step
+│   │   │   └── errors.go
+│   │
+│   │   └── testing/
+│   │       ├── testcontainers.go
+│   │       ├── fixtures.go
+│   │       └── fake_clock.go
+│   │
+│   ├── marketdata/
+│   │   ├── domain/
+│   │   │   ├── model.go
+│   │   │   ├── ports.go
+│   │   │   └── errors.go
+│   │   ├── app/
+│   │   │   ├── ingest_usecase.go
+│   │   │   ├── aggregate_usecase.go
+│   │   │   └── query_usecase.go
+│   │   ├── adapter/
+│   │   │   ├── provider/
+│   │   │   │   ├── binance/
+│   │   │   │   │   ├── ws_client.go
+│   │   │   │   │   ├── rest_client.go
+│   │   │   │   │   └── mapper.go
+│   │   │   │   └── xtb/
+│   │   │   │       ├── ws_client.go
+│   │   │   │       └── mapper.go
+│   │   │   ├── broker/kafka/
+│   │   │   │   ├── publisher.go
+│   │   │   │   └── topics.go
+│   │   │   ├── cache/redis/
+│   │   │   │   ├── cache.go
+│   │   │   │   └── keys.go
+│   │   │   └── store/postgres/
+│   │   │       ├── repo.go
+│   │   │       └── mapper.go
+│   │   └── transport/grpc/
+│   │       ├── server.go
+│   │       ├── handler.go
+│   │       └── mapper.go
+│   │
+│   ├── orders/
+│   │   ├── domain/
+│   │   │   ├── model.go
+│   │   │   ├── ports.go
+│   │   │   └── errors.go
+│   │   ├── app/
+│   │   │   ├── place_order_usecase.go
+│   │   │   ├── cancel_order_usecase.go
+│   │   │   └── workflows/
+│   │   │       ├── place_order_workflow.go
+│   │   │       ├── steps_create_order.go
+│   │   │       ├── steps_reserve_balance.go
+│   │   │       ├── steps_publish_event.go
+│   │   │       └── compensation.go
+│   │   ├── adapter/
+│   │   │   ├── store/postgres/
+│   │   │   │   ├── repo.go
+│   │   │   │   ├── queries.sql
+│   │   │   │   └── mapper.go
+│   │   │   ├── broker/kafka/
+│   │   │   │   ├── publisher.go
+│   │   │   │   └── topics.go
+│   │   │   └── provider/
+│   │   │       ├── binance/
+│   │   │       │   ├── rest_client.go
+│   │   │       │   ├── signer.go
+│   │   │       │   └── mapper.go
+│   │   │       └── xtb/
+│   │   │           ├── rest_client.go
+│   │   │           └── mapper.go
+│   │   └── transport/grpc/
+│   │       ├── server.go
+│   │       ├── handler.go
+│   │       └── mapper.go
+│   │
+│   ├── accounts/
+│   │   ├── domain/
+│   │   │   ├── model.go
+│   │   │   ├── ports.go
+│   │   │   └── errors.go
+│   │   ├── app/
+│   │   │   ├── reserve_balance_usecase.go
+│   │   │   ├── release_balance_usecase.go
+│   │   │   ├── debit_usecase.go
+│   │   │   └── credit_usecase.go
+│   │   ├── adapter/
+│   │   │   ├── store/postgres/
+│   │   │   │   ├── repo.go
+│   │   │   │   └── mapper.go
+│   │   │   ├── cache/redis/
+│   │   │   │   ├── cache.go
+│   │   │   │   └── keys.go
+│   │   │   └── broker/kafka/
+│   │   │       ├── publisher.go
+│   │   │       └── topics.go
+│   │   └── transport/grpc/
+│   │       ├── server.go
+│   │       ├── handler.go
+│   │       └── mapper.go
+│   │
+│   └── gateway/
+│       ├── contracts/
+│       │   ├── http_requests.go
+│       │   ├── http_responses.go
+│       │   └── validation.go
+│       ├── app/
+│       │   ├── bff_marketdata.go
+│       │   ├── bff_orders.go
+│       │   ├── bff_accounts.go
+│       │   └── authz.go
+│       ├── adapter/
+│       │   ├── clients/
+│       │   │   ├── marketdata_grpc/
+│       │   │   │   ├── client.go
+│       │   │   │   └── mapper.go
+│       │   │   ├── orders_grpc/
+│       │   │   │   ├── client.go
+│       │   │   │   └── mapper.go
+│       │   │   └── accounts_grpc/
+│       │   │       ├── client.go
+│       │   │       └── mapper.go
+│       │   └── ratelimit/redis/
+│       │       ├── limiter.go
+│       │       └── keys.go
+│       └── transport/http/
+│           ├── server.go
+│           ├── router.go
+│           ├── middleware/
+│           │   ├── auth.go
+│           │   ├── ratelimit.go
+│           │   ├── logging.go
+│           │   └── tracing.go
+│           └── handlers/
+│               ├── health.go
+│               ├── marketdata.go
+│               ├── orders.go
+│               └── accounts.go
+
+├── deployments/
+│   ├── docker/
+│   │   ├── market-ingestor.Dockerfile
+│   │   ├── stream-processor.Dockerfile
+│   │   ├── history-writer.Dockerfile
+│   │   ├── realtime-gateway.Dockerfile
+│   │   └── api-gateway.Dockerfile
+│   ├── k8s/
+│   │   ├── base/
+│   │   │   ├── namespace.yaml
+│   │   │   ├── configmap.yaml
+│   │   │   ├── secrets.yaml
+│   │   │   ├── services/
+│   │   │   │   ├── market-ingestor.yaml
+│   │   │   │   ├── stream-processor.yaml
+│   │   │   │   ├── history-writer.yaml
+│   │   │   │   ├── realtime-gateway.yaml
+│   │   │   │   └── api-gateway.yaml
+│   │   │   └── ingress/
+│   │   │       └── api-gateway-ingress.yaml
+│   │   └── overlays/
+│   │       ├── dev/kustomization.yaml
+│   │       └── prod/kustomization.yaml
+│   └── observability/
+│       ├── prometheus/alerts/
+│       │   ├── latency.yml
+│       │   ├── errors.yml
+│       │   └── saturation.yml
+│       ├── grafana/dashboards/
+│       │   ├── api-gateway.json
+│       │   ├── kafka.json
+│       │   └── services-overview.json
+│       └── slo/
+│           ├── api-gateway.yml
+│           └── orders.yml
+
+├── tests/
+│   ├── unit/
+│   ├── integration/
+│   ├── contract/
+│   ├── load/k6/
+│   │   ├── normal_load.js
+│   │   └── spike_load.js
+│   └── chaos/
+│       ├── pod_kill.yaml
+│       └── network_delay.yaml
+
+├── migrations/
+│   ├── shared/
+│   │   ├── 000001_outbox.up.sql
+│   │   ├── 000001_outbox.down.sql
+│   │   └── 000002_idempotency.up.sql
+│   ├── orders/
+│   │   ├── 000001_orders_init.up.sql
+│   │   └── 000001_orders_init.down.sql
+│   ├── accounts/
+│   │   ├── 000001_accounts_init.up.sql
+│   │   └── 000001_accounts_init.down.sql
+│   └── marketdata/
+│       ├── 000001_marketdata_init.up.sql
+│       └── 000001_marketdata_init.down.sql
+
+└── scripts/                         # (4) local dev tooling
+    ├── gen/
+    │   ├── proto.sh
+    │   └── mocks.sh
+    └── local/
+        ├── up.sh
+        ├── down.sh
+        └── reset-db.sh
+
+└── docker-compose.yml               # (4) local stack: kafka+postgres+redis (+ prometheus optional)
