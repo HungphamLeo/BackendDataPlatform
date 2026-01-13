@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package marketdata.v1;
+
+option go_package = "github.com/HungphamLeo/BackendDataPlatform/api/gen/go/marketdata/v1;marketdatav1";
+
+service RealtimeCacheService {
+  rpc GetKey(GetKeyRequest) returns (GetKeyResponse);
+  rpc GetTicker(GetTickerRequest) returns (GetKeyResponse);
+  rpc GetLatestCandle(GetLatestCandleRequest) returns (GetKeyResponse);
+}
+
+message GetKeyRequest {
+  string key = 1;
+}
+
+message GetTickerRequest {
+  string symbol = 1; // e.g. EURUSD, AAPL
+}
+
+message GetLatestCandleRequest {
+  string timeframe = 1; // e.g. "1m", "5m"
+}
+
+message GetKeyResponse {
+  bool found = 1;
+  string key = 2;
+  string json = 3;  // raw JSON payload stored in Redis
+}
