@@ -1,13 +1,13 @@
+
 # 💻 Code Examples - Hướng Dẫn Chi Tiết Từng File
 
 Đây là các đoạn code mẫu bạn sẽ viết cho từng tệp trong project.
-
----
 
 ## 1️⃣ Shared Kernel (Code Chung)
 
 ### File: `internal/sharedkernel/money.go`
 
+---
 ```go
 package sharedkernel
 
@@ -78,8 +78,10 @@ func (m *Money) String() string {
     return fmt.Sprintf("%.2f %s", float64(m.Amount)/100, m.Currency)
 }
 ```
+---
 
 **Cách dùng:**
+---
 ```go
 // Tạo 10 USD
 money1, _ := sharedkernel.NewMoney(1000, "USD")
@@ -100,11 +102,11 @@ if money1.IsGreaterThan(money2) {
     fmt.Println("money1 nhiều hơn")
 }
 ```
-
 ---
 
 ### File: `internal/sharedkernel/symbol.go`
 
+---
 ```go
 package sharedkernel
 
@@ -142,11 +144,11 @@ func (s *Symbol) IsEqual(other *Symbol) bool {
     return s.Code == other.Code
 }
 ```
-
 ---
 
 ### File: `internal/sharedkernel/errors.go`
 
+---
 ```go
 package sharedkernel
 
@@ -180,13 +182,13 @@ var (
     }
 )
 ```
-
 ---
 
 ## 2️⃣ Domain Layer
 
 ### File: `internal/orders/domain/order.go`
 
+---
 ```go
 package domain
 
@@ -310,11 +312,11 @@ func (o *Order) Fill() error {
     return fmt.Errorf("cannot fill order in %s status", o.Status)
 }
 ```
-
 ---
 
 ### File: `internal/orders/domain/repository.go`
 
+---
 ```go
 package domain
 
@@ -337,11 +339,11 @@ type EventPublisher interface {
     Publish(ctx context.Context, topic string, event interface{}) error
 }
 ```
-
 ---
 
 ### File: `internal/accounts/domain/account.go`
 
+---
 ```go
 package domain
 
@@ -467,13 +469,13 @@ func (a *Account) Release(amount *sharedkernel.Money) error {
     return nil
 }
 ```
-
 ---
 
 ## 3️⃣ Application Layer (Use Cases)
 
 ### File: `internal/orders/app/place_order_usecase.go`
 
+---
 ```go
 package app
 
@@ -636,13 +638,13 @@ func (uc *PlaceOrderUseCase) Execute(
     return result, nil
 }
 ```
-
 ---
 
 ## 4️⃣ Adapter Layer (Database)
 
 ### File: `internal/orders/adapter/store/postgres/repo.go`
 
+---
 ```go
 package postgres
 
@@ -855,13 +857,13 @@ func (r *PostgresOrderRepository) Delete(ctx context.Context, id string) error {
     return nil
 }
 ```
-
 ---
 
 ## 5️⃣ Transport Layer (HTTP)
 
 ### File: `internal/orders/transport/http_handler.go`
 
+---
 ```go
 package transport
 
@@ -973,13 +975,13 @@ func (h *PlaceOrderHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
     })
 }
 ```
-
 ---
 
 ## 6️⃣ SQL Migrations
 
 ### File: `migrations/orders/000001_orders_init.up.sql`
 
+---
 ```sql
 -- Tạo table orders
 CREATE TABLE IF NOT EXISTS orders (
@@ -1020,9 +1022,11 @@ CREATE TABLE IF NOT EXISTS outbox (
 CREATE INDEX idx_outbox_published_at ON outbox(published_at) WHERE published_at IS NULL;
 CREATE INDEX idx_outbox_created_at ON outbox(created_at);
 ```
+---
 
 ### File: `migrations/accounts/000001_accounts_init.up.sql`
 
+---
 ```sql
 -- Tạo table accounts
 CREATE TABLE IF NOT EXISTS accounts (
@@ -1043,13 +1047,13 @@ CREATE INDEX idx_accounts_status ON accounts(status);
 -- Constraint: available = balance - reserved
 -- (MySQL: CHECK (available_balance = balance - reserved_balance))
 ```
-
 ---
 
 ## 7️⃣ Protobuf Definitions
 
 ### File: `api/proto/orders/v1/orders.proto`
 
+---
 ```protobuf
 syntax = "proto3";
 
@@ -1061,6 +1065,7 @@ import "google/protobuf/timestamp.proto";
 message PlaceOrderRequest {
     string symbol = 1;      // AAPL
     string side = 2;        // BUY, SELL
+    
     int64 price = 3;        // 18000 = 180.00
     double quantity = 4;    // 10
 }
@@ -1092,11 +1097,11 @@ service OrderService {
     rpc PlaceOrder(PlaceOrderRequest) returns (PlaceOrderResponse) {}
 }
 ```
-
 ---
 
 ## 📝 Cách Compile Protobuf
 
+---
 ```bash
 # Cài đặt tools
 go install github.com/bufbuild/buf/cmd/buf@latest
@@ -1116,7 +1121,6 @@ EOF
 # Generate Go code
 buf generate api/proto
 ```
-
 ---
 
 **Các bước tiếp theo để bạn code:**
