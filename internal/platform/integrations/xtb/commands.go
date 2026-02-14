@@ -1,6 +1,6 @@
-package xtb
+package binance
 
-// Streaming command names (cmd_stream_execute in xtb_connection.txt)
+// Streaming command names (cmd_stream_execute in binance_connection.txt)
 const (
 	StreamGetTickPrices  = "getTickPrices"
 	StreamGetCandles     = "getCandles"

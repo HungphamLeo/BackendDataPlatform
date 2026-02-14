@@ -10,14 +10,14 @@ import (
 
 	"github.com/HungphamLeo/BackendDataPlatform/internal/infra/kafka"
 	"github.com/HungphamLeo/BackendDataPlatform/internal/infra/redisclient"
-	"github.com/HungphamLeo/BackendDataPlatform/internal/infra/xtb"
+	"github.com/HungphamLeo/BackendDataPlatform/internal/infra/binance"
 	"github.com/HungphamLeo/BackendDataPlatform/pkg/recorders"
 )
 
 type IngestorConfig struct {
 	KafkaProducer kafka.Producer
 	RedisClient   *redisclient.RedisClient
-	XTBClient     xtb.XTBClient
+	binanceClient     binance.binanceClient
 	TopicPrefix   string
 }
 
@@ -46,12 +46,12 @@ func (i *Ingestor) AddChannel(ch string) {
 }
 
 func (i *Ingestor) Run(ctx context.Context) error {
-	// connect XTB
-	if err := i.conf.XTBClient.Connect(ctx); err != nil {
+	// connect binance
+	if err := i.conf.binanceClient.Connect(ctx); err != nil {
 		return err
 	}
 
-	msgCh, err := i.conf.XTBClient.Receive()
+	msgCh, err := i.conf.binanceClient.Receive()
 	if err != nil {
 		return err
 	}
@@ -68,8 +68,8 @@ func (i *Ingestor) Run(ctx context.Context) error {
 }
 
 func (i *Ingestor) subscribeAll() error {
-	// Build and send subscribe commands to XTB client. Implementation detail depends on protocol.
-	// Here we send simple JSON "subscribe" commands. Adapt to actual XTB socket protocol.
+	// Build and send subscribe commands to binance client. Implementation detail depends on protocol.
+	// Here we send simple JSON "subscribe" commands. Adapt to actual binance socket protocol.
 	for _, ch := range i.channels {
 		parts := strings.Split(ch, ":")
 		cmd := map[string]interface{}{
@@ -79,7 +79,7 @@ func (i *Ingestor) subscribeAll() error {
 		if len(parts) > 1 {
 			cmd["sub"] = parts[1]
 		}
-		_ = i.conf.XTBClient.Send(cmd)
+		_ = i.conf.binanceClient.Send(cmd)
 	}
 	return nil
 }
@@ -113,7 +113,7 @@ func (i *Ingestor) processMessage(ctx context.Context, raw string) error {
 		return err
 	}
 
-	// Determine the type/command. This mapping should match XTB messages
+	// Determine the type/command. This mapping should match binance messages
 	// e.g., envelope["command"] or envelope["type"] etc.
 	cmd, _ := envelope["command"].(string)
 	data := envelope["data"]
@@ -123,8 +123,8 @@ func (i *Ingestor) processMessage(ctx context.Context, raw string) error {
 		rec := recorders.TickerRecordFromRaw(data)
 		// cache in redis
 		b, _ := json.Marshal(rec)
-		_ = i.conf.RedisClient.SetJSON(ctx, "xtb:ticker:"+rec.Symbol, string(b), 10*time.Second)
-		_ = i.conf.RedisClient.SetJSON(ctx, "xtb:candles:"+timeframe, string(b), 2*time.Minute)
+		_ = i.conf.RedisClient.SetJSON(ctx, "binance:ticker:"+rec.Symbol, string(b), 10*time.Second)
+		_ = i.conf.RedisClient.SetJSON(ctx, "binance:candles:"+timeframe, string(b), 2*time.Minute)
 
 		// publish to kafka
 		_ = i.conf.KafkaProducer.Publish(ctx, i.conf.TopicPrefix+"-ticker", []byte(rec.Symbol), b)
@@ -136,8 +136,8 @@ func (i *Ingestor) processMessage(ctx context.Context, raw string) error {
 				b, _ := json.Marshal(c)
 				_ = i.conf.KafkaProducer.Publish(ctx, i.conf.TopicPrefix+"-candles-"+timeframe, []byte(c.StartTime.String()), b)
 				// Optionally cache latest candle per timeframe
-				_ = i.conf.RedisClient.SetJSON(ctx, "xtb:ticker:"+rec.Symbol, string(b), 10*time.Second)
-				_ = i.conf.RedisClient.SetJSON(ctx, "xtb:candles:"+timeframe, string(b), 2*time.Minute)
+				_ = i.conf.RedisClient.SetJSON(ctx, "binance:ticker:"+rec.Symbol, string(b), 10*time.Second)
+				_ = i.conf.RedisClient.SetJSON(ctx, "binance:candles:"+timeframe, string(b), 2*time.Minute)
 
 		}
 	default:

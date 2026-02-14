@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -18,9 +19,9 @@ func main() {
 
 	// Examples:
 	// REDIS_CLEAN_INTERVAL=10m
-	// REDIS_CLEAN_PATTERNS=xtb:ticker:*,xtb:candles:*,xtb:balance:*
+	// REDIS_CLEAN_PATTERNS=binance:ticker:*,binance:candles:*,binance:balance:*
 	interval := mustDuration(getenv("REDIS_CLEAN_INTERVAL", "10m"))
-	patterns := splitCSV(getenv("REDIS_CLEAN_PATTERNS", "xtb:ticker:*,xtb:candles:*"))
+	patterns := splitCSV(getenv("REDIS_CLEAN_PATTERNS", "binance:ticker:*,binance:candles:*"))
 
 	threshold := getenvFloat("REDIS_MEM_THRESHOLD", 0.80)
 

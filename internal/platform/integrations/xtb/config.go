@@ -1,14 +1,14 @@
-package xtb
+package binance
 
 import "time"
 
-// Config defines how we connect to XTB xAPI.
+// Config defines how we connect to binance xAPI.
 //
-// In XTB, there are 2 separate connections:
+// In binance, there are 2 separate connections:
 //   1) API (commandExecute / execute): login, getChartRangeRequest, ...
 //   2) Streaming: subscribe via streamSessionId (getTickPrices, getBalance, ...)
 //
-// This mirrors xtb_connection.txt (Python) so the Go code keeps the same contract.
+// This mirrors binance_connection.txt (Python) so the Go code keeps the same contract.
 type Config struct {
 	Address       string
 	APIPort       int
@@ -27,7 +27,7 @@ type Config struct {
 
 func DefaultConfig() Config {
 	return Config{
-		Address:        "xapi.xtb.com",
+		Address:        "xapi.binance.com",
 		APIPort:        5124, // demo by default
 		StreamingPort:  5125,
 		TLSEnabled:     true,

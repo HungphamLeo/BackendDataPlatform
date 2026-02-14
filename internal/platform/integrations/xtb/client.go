@@ -1,4 +1,4 @@
-package xtb
+package binance
 
 import (
 	"context"
@@ -7,22 +7,22 @@ import (
 	"sync"
 )
 
-// Credentials holds login parameters for XTB.
+// Credentials holds login parameters for binance.
 type Credentials struct {
-	UserID  string
+	UserID   string
 	Password string
-	AppName string
+	AppName  string
 }
 
-// XTBClient is the minimal interface consumed by the market ingestor.
+// binanceClient is the minimal interface consumed by the market ingestor.
 // Keeping it small helps preserve clean boundaries (app depends on ports).
-type XTBClient interface {
+type binanceClient interface {
 	Connect(ctx context.Context) error
 	Close() error
 	Receive() (<-chan string, error)
 	Send(obj any) error
 
-	// Convenience subscription helpers (mirrors xtb_connection.txt)
+	// Convenience subscription helpers (mirrors binance_connection.txt)
 	SubscribePrice(symbol string) error
 	SubscribeBalance() error
 	SubscribeTradeStatus() error
@@ -37,7 +37,7 @@ type XTBClient interface {
 
 // Client implements both the API socket and streaming socket.
 //
-// Behavior mirrors xtb_connection.txt:
+// Behavior mirrors binance_connection.txt:
 // - connect API socket
 // - execute login -> streamSessionId
 // - connect streaming socket
@@ -52,9 +52,9 @@ type Client struct {
 	api    *jsonSocket
 	stream *jsonSocket
 
-	mu             sync.RWMutex
+	mu              sync.RWMutex
 	streamSessionId string
-	connected      bool
+	connected       bool
 
 	recvOnce sync.Once
 	recvCh   chan string
@@ -129,7 +129,7 @@ func (c *Client) Receive() (<-chan string, error) {
 	ok := c.connected
 	c.mu.RUnlock()
 	if !ok {
-		return nil, fmt.Errorf("xtb client not connected")
+		return nil, fmt.Errorf("binance client not connected")
 	}
 	return c.recvCh, nil
 }
@@ -139,7 +139,7 @@ func (c *Client) Send(obj any) error {
 	ok := c.connected
 	c.mu.RUnlock()
 	if !ok {
-		return fmt.Errorf("xtb client not connected")
+		return fmt.Errorf("binance client not connected")
 	}
 	return c.stream.Send(obj)
 }
@@ -161,10 +161,10 @@ func (c *Client) executeAPI(cmd string, args map[string]any) (map[string]any, er
 
 func (c *Client) login(ctx context.Context) (string, error) {
 	if c.creds.UserID == "" || c.creds.Password == "" {
-		return "", fmt.Errorf("missing XTB credentials (UserID/Password)")
+		return "", fmt.Errorf("missing binance credentials (UserID/Password)")
 	}
 	resp, err := c.executeAPI("login", map[string]any{
-		"userId":  c.creds.UserID,
+		"userId":   c.creds.UserID,
 		"password": c.creds.Password,
 		"appName":  c.creds.AppName,
 	})
@@ -174,11 +174,11 @@ func (c *Client) login(ctx context.Context) (string, error) {
 	// expected: {"status": true, "streamSessionId": "...", ...}
 	status, _ := resp["status"].(bool)
 	if !status {
-		return "", fmt.Errorf("xtb login failed: %v", resp)
+		return "", fmt.Errorf("binance login failed: %v", resp)
 	}
 	ssid, _ := resp["streamSessionId"].(string)
 	if ssid == "" {
-		return "", fmt.Errorf("xtb login missing streamSessionId: %v", resp)
+		return "", fmt.Errorf("binance login missing streamSessionId: %v", resp)
 	}
 	return ssid, nil
 }

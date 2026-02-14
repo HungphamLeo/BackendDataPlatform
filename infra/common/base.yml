@@ -1,0 +1,23 @@
+# Biến global dùng cho tất cả services
+version: "1.0"
+environment: "${ENV:staging}"  # staging, production
+project_name: "backend-data-platform"
+
+# Docker base images
+images:
+  base_go_image: "golang:1.23-alpine"
+  runtime_image: "alpine:3.20"
+
+# Logging template
+logging:
+  level: "${LOG_LEVEL:info}"
+  format: "json"  # json, text
+  outputs:
+    - "stdout"
+    - "file:./logs/app.log"
+
+# Tracing default
+tracing:
+  enabled: true
+  sample_rate: 1.0
+  exporter: "jaeger"

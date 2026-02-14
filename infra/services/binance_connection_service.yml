@@ -1,0 +1,125 @@
+# binance Connection Service - riêng biệt
+service:
+  name: "binance-connection-service"
+  version: "1.0.0"
+  port:
+    grpc: 50051
+    http: 8051
+    metrics: 9051
+  
+  # Timeout & retry policies
+  timeouts:
+    startup: "30s"
+    shutdown: "10s"
+    default_request: "5s"
+    binance_connection: "15s"  # binance specific
+  
+  retries:
+    max_attempts: 3
+    backoff_multiplier: 2.0
+    initial_delay: "100ms"
+
+# binance Broker Configuration
+binance:
+  enabled: true
+  broker:
+    name: "binance"
+    server_url: "${binance_SERVER_URL:wss://api.binance.com/v2}"
+    api_key: "${binance_API_KEY:required}"
+    user_id: "${binance_USER_ID:required}"
+    password: "${binance_PASSWORD:required}"
+  
+  connection:
+    max_reconnect_attempts: 5
+    reconnect_delay: "5s"
+    heartbeat_interval: "30s"
+    connection_timeout: "10s"
+  
+  trading:
+    trading_enabled: "${binance_TRADING_ENABLED:false}"
+    max_leverage: 10
+    slippage_tolerance: 0.001  # 0.1%
+    order_timeout: "30s"
+
+# Database Config
+database:
+  primary:
+    type: "postgres"
+    host: "${DB_HOST:localhost}"
+    port: 5432
+    database: "binance_connection_db"
+    user: "${DB_USER:postgres}"
+    password: "${DB_PASSWORD:required}"
+    pool_size: 20
+    connection_timeout: "10s"
+  
+  migrations:
+    auto_migrate: true
+    path: "./migrations"
+
+# Message Queue (Event Publishing)
+messaging:
+  provider: "kafka"
+  brokers:
+    - "${KAFKA_BROKER_1:localhost:9092}"
+    - "${KAFKA_BROKER_2:localhost:9093}"
+    - "${KAFKA_BROKER_3:localhost:9094}"
+  
+  topics:
+    - name: "binance.trades.executed"
+      partitions: 3
+      replication_factor: 2
+    - name: "binance.account.synced"
+      partitions: 1
+      replication_factor: 2
+    - name: "binance.prices.updated"
+      partitions: 6
+      replication_factor: 2
+  
+  consumer:
+    group_id: "binance-connection-service"
+    auto_commit: false
+    session_timeout: "30s"
+
+# Cache Layer
+cache:
+  provider: "redis"
+  host: "${REDIS_HOST:localhost}"
+  port: 6379
+  password: "${REDIS_PASSWORD:''}"
+  database: 1
+  ttl_default: "5m"
+
+# Observability
+observability:
+  logger:
+    level: "${LOG_LEVEL:info}"
+    format: "json"
+  
+  metrics:
+    enabled: true
+    port: 9051
+    interval: "10s"
+    metrics:
+      - "binance.connection.status"
+      - "binance.trades.count"
+      - "binance.api.latency"
+      - "binance.reconnections.total"
+  
+  tracing:
+    enabled: true
+    exporter: "jaeger"
+    endpoint: "${JAEGER_ENDPOINT:http://localhost:14268/api/traces}"
+    service_name: "binance-connection-service"
+
+# Health Checks
+health:
+  enabled: true
+  liveness:
+    initial_delay: "5s"
+    period: "10s"
+    timeout: "5s"
+  readiness:
+    initial_delay: "10s"
+    period: "5s"
+    timeout: "5s"

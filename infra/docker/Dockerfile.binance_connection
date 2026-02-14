@@ -1,0 +1,44 @@
+# Stage 1: Builder
+FROM golang:1.23-alpine AS builder
+
+WORKDIR /src
+
+# Install build tools
+RUN apk add --no-cache git make protobuf-dev
+
+# Copy go.mod first (layer caching)
+COPY services/binance-connection/go.mod services/binance-connection/go.sum ./
+
+# Download dependencies
+RUN go mod download
+
+# Copy source code
+COPY api/ ../api/
+COPY shared/ ../shared/
+COPY services/binance-connection/ .
+
+# Build binary
+RUN CGO_ENABLED=1 GOOS=linux go build -ldflags="-s -w" -o /app cmd/main.go
+
+# Stage 2: Runtime
+FROM alpine:3.20
+
+RUN apk add --no-cache ca-certificates tzdata
+
+WORKDIR /app
+
+# Copy config from infra/
+COPY infra/services/binance-connection-service.yml ./config.yml
+COPY infra/docker/scripts/entrypoint.sh ./
+
+# Copy binary from builder
+COPY --from=builder /app /app/
+
+# Create non-root user
+RUN addgroup -g 1000 appuser && adduser -u 1000 -G appuser -s /sbin/nologin -D appuser
+USER appuser
+
+EXPOSE 50051 8051 9051
+
+ENTRYPOINT ["./entrypoint.sh"]
+CMD ["./binance-connection-service"]

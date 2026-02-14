@@ -10,7 +10,7 @@ import (
 	"time"
 
 	ingestor "github.com/HungphamLeo/BackendDataPlatform/internal/marketdata/app/ingestor"
-	xtb "github.com/HungphamLeo/BackendDataPlatform/internal/platform/integrations/xtb"
+	binance "github.com/HungphamLeo/BackendDataPlatform/internal/platform/integrations/binance"
 	kafka "github.com/HungphamLeo/BackendDataPlatform/internal/platform/messaging/kafka"
 	redisclient "github.com/HungphamLeo/BackendDataPlatform/internal/platform/storage/redis"
 )
@@ -23,16 +23,16 @@ func main() {
 	kafkaBrokers := splitEnv("KAFKA_BROKERS", "localhost:9092")
 	redisAddr := getenv("REDIS_ADDR", "localhost:6379")
 
-	xtbAddress := getenv("XTB_ADDRESS", "xapi.xtb.com")
-	apiPort := getenvInt("XTB_API_PORT", 5124)
-	streamPort := getenvInt("XTB_STREAM_PORT", 5125)
-	tlsEnabled := getenvBool("XTB_TLS", true)
+	binanceAddress := getenv("binance_ADDRESS", "xapi.binance.com")
+	apiPort := getenvInt("binance_API_PORT", 5124)
+	streamPort := getenvInt("binance_STREAM_PORT", 5125)
+	tlsEnabled := getenvBool("binance_TLS", true)
 
-	userID := os.Getenv("XTB_USER_ID")
-	password := os.Getenv("XTB_PASSWORD")
-	appName := getenv("XTB_APP_NAME", "go")
+	userID := os.Getenv("binance_USER_ID")
+	password := os.Getenv("binance_PASSWORD")
+	appName := getenv("binance_APP_NAME", "go")
 
-	symbols := splitEnv("XTB_SYMBOLS", "EURUSD")
+	symbols := splitEnv("binance_SYMBOLS", "EURUSD")
 
 	// infra: kafka producer
 	kp, err := kafka.NewProducer(kafkaBrokers)
@@ -45,21 +45,21 @@ func main() {
 	rc := redisclient.New(redisAddr)
 	defer rc.Close()
 
-	// integration: xtb client
-	cfg := xtb.DefaultConfig()
-	cfg.Address = xtbAddress
+	// integration: binance client
+	cfg := binance.DefaultConfig()
+	cfg.Address = binanceAddress
 	cfg.APIPort = apiPort
 	cfg.StreamingPort = streamPort
 	cfg.TLSEnabled = tlsEnabled
 
-	xClient := xtb.NewClient(cfg, xtb.Credentials{UserID: userID, Password: password, AppName: appName})
+	xClient := binance.NewClient(cfg, binance.Credentials{UserID: userID, Password: password, AppName: appName})
 	defer xClient.Close()
 
 	ing := ingestor.NewIngestor(ingestor.IngestorConfig{
 		KafkaProducer: kp,
 		RedisClient:   rc,
-		XTBClient:     xClient,
-		TopicPrefix:   "xtb",
+		binanceClient: xClient,
+		TopicPrefix:   "binance",
 		Symbols:       symbols,
 	})
 

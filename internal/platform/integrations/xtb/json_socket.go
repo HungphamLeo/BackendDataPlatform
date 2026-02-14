@@ -1,4 +1,4 @@
-package xtb
+package binance
 
 import (
 	"bufio"
@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-// jsonSocket implements the JsonSocket behavior from xtb_connection.txt.
+// jsonSocket implements the JsonSocket behavior from binance_connection.txt.
 // It can decode sequential JSON objects from a TCP stream (no explicit delimiter)
 // using json.Decoder.
 type jsonSocket struct {
@@ -57,7 +57,7 @@ func (s *jsonSocket) Connect(ctx context.Context) error {
 	if lastErr == nil {
 		lastErr = fmt.Errorf("unable to connect")
 	}
-	return fmt.Errorf("xtb jsonSocket connect failed after %d tries: %w", s.cfg.MaxConnTries, lastErr)
+	return fmt.Errorf("binance jsonSocket connect failed after %d tries: %w", s.cfg.MaxConnTries, lastErr)
 }
 
 func (s *jsonSocket) Close() error {
@@ -77,7 +77,7 @@ func (s *jsonSocket) Send(obj any) error {
 	c := s.conn
 	s.mu.Unlock()
 	if c == nil {
-		return fmt.Errorf("xtb socket is not connected")
+		return fmt.Errorf("binance socket is not connected")
 	}
 
 	payload, err := json.Marshal(obj)
@@ -85,7 +85,7 @@ func (s *jsonSocket) Send(obj any) error {
 		return err
 	}
 
-	// XTB server accepts JSON objects concatenated, same as Python implementation.
+	// binance server accepts JSON objects concatenated, same as Python implementation.
 	_, err = c.Write(payload)
 	if err != nil {
 		return err
@@ -103,7 +103,7 @@ func (s *jsonSocket) ReadOne() (map[string]any, error) {
 	dec := s.dec
 	s.mu.Unlock()
 	if dec == nil {
-		return nil, fmt.Errorf("xtb socket is not connected")
+		return nil, fmt.Errorf("binance socket is not connected")
 	}
 	var m map[string]any
 	if err := dec.Decode(&m); err != nil {
