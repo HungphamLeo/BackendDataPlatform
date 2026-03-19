@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"internal/marketdata/application/dto"
-	"internal/marketdata/application/ports"
-	"internal/marketdata/domain/value_object"
+	"github.com/HungphamLeo/BackendDataPlatform/internal/marketdata/application/dto"
+	"github.com/HungphamLeo/BackendDataPlatform/internal/marketdata/application/ports"
+	"github.com/HungphamLeo/BackendDataPlatform/internal/marketdata/domain/value_object"
 )
 
 // ✅ USE CASE: Get Latest Price

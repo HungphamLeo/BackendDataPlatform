@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"internal/marketdata/domain/aggregate"
-	"internal/marketdata/domain/value_object"
+	"github.com/HungphamLeo/BackendDataPlatform/internal/marketdata/domain/aggregate"
+	"github.com/HungphamLeo/BackendDataPlatform/internal/marketdata/domain/value_object"
 )
 
 // ✅ PERSISTENCE PORT

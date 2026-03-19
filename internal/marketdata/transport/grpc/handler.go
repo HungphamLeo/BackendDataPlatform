@@ -4,8 +4,8 @@ import (
 	"context"
 
 	pb "api/proto/marketdata/v1"
-	"internal/marketdata/application/usecase"
-	"internal/marketdata/domain/value_object"
+	"github.com/HungphamLeo/BackendDataPlatform/internal/marketdata/application/usecase"
+	"github.com/HungphamLeo/BackendDataPlatform/internal/marketdata/domain/value_object"
 )
 
 // ✅ gRPC SERVICE HANDLER

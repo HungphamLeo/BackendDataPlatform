@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"time"
 
-	"internal/marketdata/domain/entity"
-	"internal/marketdata/domain/event"
-	"internal/marketdata/domain/value_object"
+	"github.com/HungphamLeo/BackendDataPlatform/internal/marketdata/domain/entity"
+	"github.com/HungphamLeo/BackendDataPlatform/internal/marketdata/domain/event"
+	"github.com/HungphamLeo/BackendDataPlatform/internal/marketdata/domain/value_object"
 )
 
 // ✅ AGGREGATE ROOT: Ticker
