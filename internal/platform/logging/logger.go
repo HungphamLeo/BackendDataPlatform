@@ -1,9 +1,11 @@
 package logging
 
 import (
+	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"net/http"
 	"sync"
+	"path/filepath"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"os"
@@ -25,27 +27,38 @@ func init() {
 	prometheus.MustRegister(logEntries)
 }
 
-// InitLogger initializes the global logger instance.
-func InitLogger() {
+// InitLogger initializes the global logger instance with an optional file path.
+func InitLogger(logFilePath string) {
 	once.Do(func() {
 		cfg := zap.NewProductionConfig()
-		cfg.OutputPaths = []string{"stdout"} // Can be extended for Loki
-		cfg.ErrorOutputPaths = []string{"stderr"}
 
-		core := zapcore.NewCore(
-			zapcore.NewJSONEncoder(cfg.EncoderConfig),
-			zapcore.AddSync(zapcore.Lock(os.Stdout)),
-			zapcore.DebugLevel,
-		)
+		var cores []zapcore.Core
+		
+		// Ghi log ra Console (dễ nhìn khi chạy docker logs/local)
+		consoleEncoder := zapcore.NewConsoleEncoder(cfg.EncoderConfig)
+		cores = append(cores, zapcore.NewCore(consoleEncoder, zapcore.AddSync(os.Stdout), zapcore.DebugLevel))
 
-		logger = zap.New(core, zap.Hooks(prometheusHook))
+		// Ghi log ra File JSON (nếu cấu hình path)
+		if logFilePath != "" {
+			// Tự động tạo folder nếu chưa tồn tại
+			if err := os.MkdirAll(filepath.Dir(logFilePath), 0755); err == nil {
+				if file, err := os.OpenFile(logFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+					fileEncoder := zapcore.NewJSONEncoder(cfg.EncoderConfig)
+					cores = append(cores, zapcore.NewCore(fileEncoder, zapcore.AddSync(file), zapcore.InfoLevel))
+				}
+			}
+		}
+
+		core := zapcore.NewTee(cores...)
+		// AddCaller để biết chính xác dòng code nào đang in ra log
+		logger = zap.New(core, zap.Hooks(prometheusHook), zap.AddCaller())
 	})
 }
 
 // GetLogger returns the global logger instance.
 func GetLogger() *zap.Logger {
 	if logger == nil {
-		InitLogger()
+		InitLogger("") // Mặc định chỉ xuất Console nếu chưa init với file
 	}
 	return logger
 }
@@ -75,6 +88,7 @@ type Logger interface {
 	Warn(msg string, fields ...zap.Field)
 	Error(msg string, fields ...zap.Field)
 	Fatal(msg string, fields ...zap.Field)
+	With(fields ...zap.Field) Logger
 }
 
 type zapLogger struct {
@@ -99,6 +113,11 @@ func (z *zapLogger) Error(msg string, fields ...zap.Field) {
 
 func (z *zapLogger) Fatal(msg string, fields ...zap.Field) {
 	z.logger.Fatal(msg, fields...)
+}
+
+// With cho phép clone Logger hiện tại kèm theo các Context Metadata cố định
+func (z *zapLogger) With(fields ...zap.Field) Logger {
+	return &zapLogger{logger: z.logger.With(fields...)}
 }
 
 // NewLogger returns a new instance of Logger

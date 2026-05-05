@@ -1,5 +1,5 @@
 // futures_ws_payloads.go
-package binance
+package streaming
 
 // Aggregate Trade (Futures): <symbol>@aggTrade
 type FuturesAggTradeEvent struct {

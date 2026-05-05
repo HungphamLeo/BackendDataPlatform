@@ -1,5 +1,5 @@
 // futures_ws_streaming_protocol.go
-package binance
+package streaming
 
 import "encoding/json"
 

@@ -1,5 +1,5 @@
 // futures_ws_streams.go
-package binance
+package streaming
 
 import (
 	"fmt"

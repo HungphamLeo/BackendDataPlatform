@@ -1,129 +1,51 @@
-package market_ingestor
+package main
 
 import (
 	"context"
-	"fmt"
-	"log"
 	"os"
 	"os/signal"
-	"strings"
-	"time"
+	"syscall"
 
-	ingestor "github.com/HungphamLeo/BackendDataPlatform/internal/marketdata/app/ingestor"
-	binance "github.com/HungphamLeo/BackendDataPlatform/internal/platform/integrations/binance"
-	kafka "github.com/HungphamLeo/BackendDataPlatform/internal/platform/messaging/kafka"
-	redisclient "github.com/HungphamLeo/BackendDataPlatform/internal/platform/storage/redis"
+	"github.com/HungphamLeo/BackendDataPlatform/internal/marketdata/adapter/kafka"
+	"github.com/HungphamLeo/BackendDataPlatform/internal/marketdata/adapter/provider/binance/futures/streaming"
+	"github.com/HungphamLeo/BackendDataPlatform/internal/marketdata/app"
+	"github.com/HungphamLeo/BackendDataPlatform/internal/platform/logging"
 )
 
 func main() {
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	// Khởi tạo Logger và ghi vào thư mục logs (Hệ thống sẽ tự tạo thư mục nếu chưa có)
+	logging.InitLogger("logs/market_ingestor/app.log")
+	logger := logging.NewLogger()
+
+	logger.Info("Starting Market Ingestor Service (Binance Futures)...")
+
+	// Bật Prometheus endpoint (non-blocking) trên port 9090
+	logging.StartPrometheusEndpoint()
+
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Minimal config via env vars (safe defaults for local dev)
-	kafkaBrokers := splitEnv("KAFKA_BROKERS", "localhost:9092")
-	redisAddr := getenv("REDIS_ADDR", "localhost:6379")
+	// 1. Khởi tạo Adapter Layer: Tách biệt hoàn toàn, dễ dàng đổi nhà cung cấp
+	binanceFuturesProvider := streaming.NewBinanceFuturesClient(logger)
+	kafkaPublisher := kafka.NewKafkaPublisher()
 
-	binanceAddress := getenv("binance_ADDRESS", "xapi.binance.com")
-	apiPort := getenvInt("binance_API_PORT", 5124)
-	streamPort := getenvInt("binance_STREAM_PORT", 5125)
-	tlsEnabled := getenvBool("binance_TLS", true)
+	// 2. Khởi tạo Application Layer: Inject dependencies vào Use Case
+	useCase := app.NewMarketIngestorUseCase(binanceFuturesProvider, kafkaPublisher, "market_data.ticks", logger)
 
-	userID := os.Getenv("binance_USER_ID")
-	password := os.Getenv("binance_PASSWORD")
-	appName := getenv("binance_APP_NAME", "go")
-
-	symbols := splitEnv("binance_SYMBOLS", "EURUSD")
-
-	// infra: kafka producer
-	kp, err := kafka.NewProducer(kafkaBrokers)
-	if err != nil {
-		log.Fatalf("kafka producer init failed: %v", err)
-	}
-	defer kp.Close()
-
-	// infra: redis client
-	rc := redisclient.New(redisAddr)
-	defer rc.Close()
-
-	// integration: binance client
-	cfg := binance.DefaultConfig()
-	cfg.Address = binanceAddress
-	cfg.APIPort = apiPort
-	cfg.StreamingPort = streamPort
-	cfg.TLSEnabled = tlsEnabled
-
-	xClient := binance.NewClient(cfg, binance.Credentials{UserID: userID, Password: password, AppName: appName})
-	defer xClient.Close()
-
-	ing := ingestor.NewIngestor(ingestor.IngestorConfig{
-		KafkaProducer: kp,
-		RedisClient:   rc,
-		binanceClient: xClient,
-		TopicPrefix:   "binance",
-		Symbols:       symbols,
-	})
-
-	// Channels you want to subscribe (mimics Python logic)
-	ing.AddChannel("ticker")
-	ing.AddChannel("balance")
-	ing.AddChannel("order_status")
-
+	// 3. Khởi chạy quá trình Ingestion trong một Goroutine riêng (Non-blocking)
 	go func() {
-		if err := ing.Run(ctx); err != nil {
-			log.Printf("ingestor run finished with error: %v", err)
-			cancel()
+		// Các cặp coin cần stream giá realtime
+		symbols := []string{"BTCUSDT", "ETHUSDT"}
+		if err := useCase.Start(ctx, symbols); err != nil {
+			logger.Fatal("Ingestor stopped with error")
 		}
 	}()
 
-	<-ctx.Done()
-	time.Sleep(500 * time.Millisecond)
-	log.Println("shutdown complete")
-}
-
-func getenv(key, def string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return def
-}
-
-func splitEnv(key, def string) []string {
-	v := getenv(key, def)
-	parts := strings.Split(v, ",")
-	out := make([]string, 0, len(parts))
-	for _, p := range parts {
-		p = strings.TrimSpace(p)
-		if p != "" {
-			out = append(out, p)
-		}
-	}
-	return out
-}
-
-func getenvInt(key string, def int) int {
-	v := os.Getenv(key)
-	if v == "" {
-		return def
-	}
-	var n int
-	_, err := fmt.Sscanf(v, "%d", &n)
-	if err != nil {
-		return def
-	}
-	return n
-}
-
-func getenvBool(key string, def bool) bool {
-	v := strings.ToLower(os.Getenv(key))
-	if v == "" {
-		return def
-	}
-	switch v {
-	case "1", "true", "yes", "y", "on":
-		return true
-	case "0", "false", "no", "n", "off":
-		return false
-	default:
-		return def
-	}
+	// 4. Graceful Shutdown (lắng nghe tín hiệu từ OS/Docker để đóng tài nguyên)
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+	
+	logger.Info("Market Ingestor Service gracefully shutting down...")
+	logging.Sync() // Đảm bảo mọi log trong buffer đều được xả ra File trước khi service tắt hoàn toàn
 }
