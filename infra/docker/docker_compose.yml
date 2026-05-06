@@ -1,0 +1,104 @@
+version: '3.9'
+
+services:
+  # Databases
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: trader
+      POSTGRES_PASSWORD: password123
+      POSTGRES_DB: trading_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - platform
+
+  # Cache
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - platform
+
+  # Message Queue
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    restart: unless-stopped
+    networks:
+      - platform
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+    ports:
+      - "2181:2181"
+    networks:
+      - platform
+
+  # Tracing
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    ports:
+      - "6831:6831/udp"
+      - "16686:16686"  # UI
+    networks:
+      - platform
+
+  # Metrics
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./infra/services/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    networks:
+      - platform
+
+  # Services
+  binance-connection:
+    build:
+      context: .
+      dockerfile: ./infra/docker/Dockerfile.binance-connection
+    environment:
+      binance_SERVER_URL: wss://api.binance.com/v2
+      binance_API_KEY: ${binance_API_KEY}
+      DB_HOST: postgres
+      KAFKA_BROKER_1: kafka:9092
+      REDIS_HOST: redis
+    ports:
+      - "50051:50051"  # gRPC
+      - "8051:8051"    # HTTP
+      - "9051:9051"    # Metrics
+    depends_on:
+      - postgres
+      - kafka
+      - redis
+      - jaeger
+    networks:
+      - platform
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  platform:
+    driver: bridge

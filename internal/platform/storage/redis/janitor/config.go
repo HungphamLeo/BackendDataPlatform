@@ -11,7 +11,7 @@ type Config struct {
 	MemoryThreshold float64 // e.g. 0.80
 
 	// Only delete keys matching these patterns (safety guard).
-	// Examples: "xtb:ticker:*", "xtb:candles:*", "xtb:balance:*"
+	// Examples: "binance:ticker:*", "binance:candles:*", "binance:balance:*"
 	Patterns []string
 
 	// How many keys to scan per iteration; larger = faster but more load.

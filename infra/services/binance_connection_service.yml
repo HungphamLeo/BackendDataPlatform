@@ -1,0 +1,49 @@
+binance:
+
+  environment: production
+
+  spot:
+
+    market_stream:
+
+      base_url: wss://stream.binance.com:9443/ws
+
+      reconnect_interval_sec: 5
+
+      ping_interval_sec: 20
+
+      max_streams_per_connection: 1024
+
+  futures:
+
+    ws_api:
+
+      base_url: wss://ws-fapi.binance.com/ws-fapi/v1
+
+      reconnect_interval_sec: 5
+
+      ping_interval_sec: 180
+
+      auth:
+
+        enabled: true
+
+        api_key: ${BINANCE_API_KEY}
+
+        private_key_path: ./keys/ed25519.pem
+
+kafka:
+
+  brokers:
+    - localhost:9092
+
+  topics:
+
+    spot_bookticker:
+      name: binance.spot.bookticker
+
+    futures_bookticker:
+      name: binance.futures.bookticker
+
+    futures_orders:
+      name: binance.futures.orders

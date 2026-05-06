@@ -164,7 +164,7 @@ trading-platform-go/
 │   │   │   │   │   ├── ws_client.go
 │   │   │   │   │   ├── rest_client.go
 │   │   │   │   │   └── mapper.go
-│   │   │   │   └── xtb/
+│   │   │   │   └── binance/
 │   │   │   │       ├── ws_client.go
 │   │   │   │       └── mapper.go
 │   │   │   ├── broker/kafka/
@@ -208,7 +208,7 @@ trading-platform-go/
 │   │   │       │   ├── rest_client.go
 │   │   │       │   ├── signer.go
 │   │   │       │   └── mapper.go
-│   │   │       └── xtb/
+│   │   │       └── binance/
 │   │   │           ├── rest_client.go
 │   │   │           └── mapper.go
 │   │   └── transport/grpc/

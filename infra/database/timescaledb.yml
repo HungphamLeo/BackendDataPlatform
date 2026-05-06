@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  timescaledb:
+    image: timescale/timescaledb:latest-pg16
+    environment:
+      POSTGRES_USER: trader
+      POSTGRES_PASSWORD: password123
+      POSTGRES_DB: trading_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - timescaledb_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - platform
+
+volumes:
+  timescaledb_data:
+
+networks:
+  platform:
+    driver: bridge

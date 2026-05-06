@@ -1,0 +1,28 @@
+package repository
+
+import (
+	"context"
+
+	"github.com/HungphamLeo/BackendDataPlatform/internal/marketdata/domain/entity"
+	"github.com/HungphamLeo/BackendDataPlatform/internal/marketdata/domain/value_object"
+)
+
+// OrderBookRepository định nghĩa interface để lưu trữ và truy xuất OrderBook
+type OrderBookRepository interface {
+	// FindBySymbol tìm OrderBook theo Symbol
+	FindBySymbol(
+		ctx context.Context,
+		symbol value_object.Symbol,
+		exchange string,
+	) (*entity.OrderBook, error)
+	
+	// Save lưu OrderBook
+	Save(ctx context.Context, orderBook *entity.OrderBook) error
+	
+	// Delete xóa OrderBook
+	Delete(
+		ctx context.Context,
+		symbol value_object.Symbol,
+		exchange string,
+	) error
+}
