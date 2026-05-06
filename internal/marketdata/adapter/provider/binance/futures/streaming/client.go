@@ -13,27 +13,29 @@ import (
 	"github.com/HungphamLeo/BackendDataPlatform/internal/platform/logging"
 )
 
-const (
-	futuresWSEndpoint = "wss://fstream.binance.com/ws"
-	maxRetries        = 5
-)
+const maxRetries = 5
 
 // BinanceFuturesClient triển khai domain.MarketDataProvider
 type BinanceFuturesClient struct {
+	wsURL   string
 	conn *websocket.Conn
 	logger  logging.Logger
 	symbols []string
 }
 
-func NewBinanceFuturesClient(logger logging.Logger) *BinanceFuturesClient {
+func NewBinanceFuturesClient(wsURL string, logger logging.Logger) *BinanceFuturesClient {
+	if wsURL == "" {
+		wsURL = "wss://fstream.binance.com/ws" // Default fallback, nhưng thực tế sẽ lấy từ config YAML
+	}
 	return &BinanceFuturesClient{
+		wsURL:  wsURL,
 		logger: logger,
 	}
 }
 
 func (c *BinanceFuturesClient) Connect(ctx context.Context) error {
 	// FIXME: Ở Production cần add Transport layer logic (dialer timeout, TLS setup)
-	conn, _, err := websocket.DefaultDialer.DialContext(ctx, futuresWSEndpoint, nil)
+	conn, _, err := websocket.DefaultDialer.DialContext(ctx, c.wsURL, nil)
 	if err != nil {
 		return fmt.Errorf("binance futures ws dial error: %w", err)
 	}

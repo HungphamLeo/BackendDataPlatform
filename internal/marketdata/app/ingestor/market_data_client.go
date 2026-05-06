@@ -1,3 +1,6 @@
+// TODO: File này vi phạm Clean Architecture. 
+// Cần di chuyển file này sang: internal/marketdata/adapter/provider/binance/rest/
+
 package rest
 
 import (
@@ -17,10 +20,8 @@ type BinanceFuturesMarketDataClient struct {
 	logger     logging.Logger
 }
 
+// Thay vì hardcode URL, baseURL sẽ được inject từ Config YAML thông qua DI
 func NewBinanceFuturesMarketDataClient(baseURL string, logger logging.Logger) *BinanceFuturesMarketDataClient {
-	if baseURL == "" {
-		baseURL = "https://fapi.binance.com"
-	}
 	return &BinanceFuturesMarketDataClient{
 		baseURL: baseURL,
 		httpClient: &http.Client{

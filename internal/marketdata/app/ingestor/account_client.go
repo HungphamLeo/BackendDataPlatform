@@ -1,3 +1,6 @@
+// TODO: File này vi phạm Clean Architecture. 
+// Cần di chuyển file này sang: internal/marketdata/adapter/provider/binance/rest/
+
 package rest
 
 import (
@@ -23,10 +26,8 @@ type BinanceFuturesAccountClient struct {
 	logger     logging.Logger
 }
 
+// BaseURL, APIKey, SecretKey phải được load từ config.yaml và inject vào từ bên ngoài
 func NewBinanceFuturesAccountClient(baseURL, apiKey, secretKey string, logger logging.Logger) *BinanceFuturesAccountClient {
-	if baseURL == "" {
-		baseURL = "https://fapi.binance.com"
-	}
 	return &BinanceFuturesAccountClient{
 		baseURL:    baseURL,
 		apiKey:     apiKey,
