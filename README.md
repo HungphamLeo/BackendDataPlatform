@@ -1,175 +1,442 @@
-Chào bạn, với tư cách là một Solution Architect, tôi rất hiểu những khó khăn của các bạn fresher khi tiếp cận một hệ thống Microservices kết hợp Event-Driven Architecture (EDA) thực tế. 
+# BackendDataPlatform
 
-Dưới đây là bản refactor file `README.md` được thiết kế theo tư duy "Top-Down" (từ bức tranh tổng thể đến chi tiết triển khai code). Tài liệu này được tinh chỉnh riêng để các bạn fresher có thể đọc hiểu luồng nghiệp vụ (Binance/XTB, Orders), nắm bắt kiến trúc, và biết chính xác phải gõ lệnh gì để chạy và test.
-
----
-
-# 🚀 Tấm Bản Đồ Khởi Hành: Trading Platform Backend (Golang)
-
-Chào mừng bạn đến với dự án Hệ thống Giao dịch Tần suất cao (Trading Platform). Nếu bạn là Fresher và cảm thấy ngợp trước Microservices, đừng lo! File README này là kim chỉ nam chi tiết nhất để bạn nắm bắt dự án, hiểu kiến trúc và tự tay chạy được những dòng code đầu tiên.
-
-## 🎯 1. Mục Tiêu Kinh Doanh (Business Objectives)
-Hệ thống của chúng ta được xây dựng để giải quyết 3 bài toán lõi:
-1. **Market Data & News Ingestion:** Trích xuất dữ liệu thị trường (giá cả, order book) và tin tức từ các sàn giao dịch lớn như **Binance** và **XTB**. Việc lấy dữ liệu diễn ra qua cả REST API (lấy snapshot) và Realtime WebSocket (stream dữ liệu) thông qua **Kafka**.
-2. **Core Trading & Account Management:** Xây dựng các function/use-case xử lý logic nghiệp vụ khắt khe: đặt lệnh giao dịch (Orders), khớp lệnh, và quản lý số dư tài khoản (Accounts).
-3. **API Gateway:** Cung cấp các Backend API Gateway chuẩn mực để Client (Web/App) gọi lấy dữ liệu và thực hiện giao dịch một cách bảo mật, ổn định.
-
-## 🏗️ 2. Kiến Trúc & Công Nghệ
-
-Dự án áp dụng mô hình **Microservices + Event-Driven Architecture (EDA)**. Thay vì gọi nhau trực tiếp và chờ đợi (gây nghẽn), các services giao tiếp bất đồng bộ thông qua các "Sự kiện" (Events) trên Kafka.
-
-
-
-### 2.1. Tech Stack Cốt Lõi
-*   **Ngôn ngữ chính:** Golang (Tối ưu cho xử lý đồng thời - concurrency).
-*   **Message Broker:** Kafka (Xử lý hàng triệu event realtime từ Binance/XTB).
-*   **Database & Cache:** PostgreSQL (Lưu trữ bền vững) & Redis (Cache tốc độ cao, rate-limit).
-*   **Core Modules:**
-    *   `viper`: Quản lý cấu hình (config) động từ file `.yaml` hoặc biến môi trường.
-    *   `zap`: Logging tốc độ cực cao, định dạng JSON chuẩn cho môi trường Production.
-    *   `gorm`: Thao tác với Database (PostgreSQL) thân thiện, dễ bảo trì.
-
-### 2.2. Mô Hình 4 Layer (Clean Architecture)
-Để code không trở thành "đống mì ý", chúng ta áp dụng mô hình 4 Layer. Hãy nhớ quy tắc: **Layer ngoài có thể gọi layer trong, layer trong không được biết về layer ngoài**[cite: 1].
-*   **Domain (Lõi):** Chứa các quy tắc nghiệp vụ (VD: Cách tính tiền, logic của một Order)[cite: 1]. Không được chứa `gorm`, `gin` hay bất kỳ framework nào tại đây[cite: 1].
-*   **Application (Use Cases):** Điều phối công việc (VD: Hàm `PlaceOrder` sẽ gọi hàm kiểm tra số dư, sau đó gọi hàm lưu DB)[cite: 1].
-*   **Adapter (Hạ tầng):** Nơi giao tiếp với thế giới bên ngoài. Đây là nơi bạn dùng `gorm` để query PostgreSQL, hoặc dùng module Kafka để publish message[cite: 1].
-*   **Transport (Giao tiếp):** Nơi tiếp nhận Request từ User (REST API, gRPC, WebSocket) và chuyển thành Command cho Application layer[cite: 1].
+Nền tảng dữ liệu thị trường tài chính thời gian thực, được xây dựng bằng **Golang** (backend chính), theo mô hình **Microservices + Event-Driven Architecture (EDA)**. Hệ thống thu thập, xử lý và cung cấp dữ liệu từ các sàn giao dịch **Binance** và **XTB** qua REST, gRPC và WebSocket.
 
 ---
 
-## 📂 3. Cấu Trúc Microservices & Thư Mục
+## Mục Lục
 
-Hệ thống được chia thành các service độc lập để dễ scale[cite: 1]:
+1. [Tổng quan kiến trúc](#1-tổng-quan-kiến-trúc)
+2. [Tech Stack](#2-tech-stack)
+3. [Cấu trúc thư mục](#3-cấu-trúc-thư-mục)
+4. [Các Microservices](#4-các-microservices)
+5. [Clean Architecture (4 Layer)](#5-clean-architecture-4-layer)
+6. [Các Pattern Quan Trọng](#6-các-pattern-quan-trọng)
+7. [Hướng dẫn chạy Local](#7-hướng-dẫn-chạy-local)
+8. [Lệnh Build & Test](#8-lệnh-build--test)
+9. [Cấu hình](#9-cấu-hình)
+10. [Database Migrations](#10-database-migrations)
+
+---
+
+## 1. Tổng quan kiến trúc
+
+Hệ thống được thiết kế theo luồng **Ingest → Process → Serve**:
+
+```
+Binance / XTB
+     │  WebSocket / REST API
+     ▼
+┌─────────────┐      Kafka Topics       ┌──────────────────┐
+│   Ingestor  │ ──────────────────────► │ Stream Processor │
+│  (Go)       │  market-data.price-     │  (Go)            │
+└─────────────┘  updated / new-trade    └────────┬─────────┘
+                                                  │ MySQL
+                                        ┌─────────▼─────────┐
+                                        │  Streaming Service │ gRPC :9092
+                                        │  (Go)             │
+                                        └─────────┬─────────┘
+                                                  │
+                                        ┌─────────▼─────────┐
+┌──────────────┐   Batch gRPC :9093     │   Query Service   │ gRPC :9091
+│ Batch Svc    │ ──────────────────────►│   (Go)            │
+│ (Python)     │                        └─────────┬─────────┘
+└──────────────┘                                  │ Redis Cache
+                                        ┌─────────▼─────────┐
+                                        │    API Service    │ REST :8090 / gRPC :9090
+                                        │    (Go)           │
+                                        └───────────────────┘
+```
+
+**Kafka Broker:** `localhost:9092`  
+**Realtime Gateway (WebSocket):** `cmd/realtime_gateway`  
+**API Gateway (HTTP + gRPC):** `cmd/api_gateway`
+
+---
+
+## 2. Tech Stack
+
+| Thành phần | Công nghệ |
+|---|---|
+| Ngôn ngữ chính | Go 1.23 |
+| Batch / Indicators | Python 3 |
+| Message Broker | Apache Kafka (Confluent 7.5) |
+| Relational DB (streaming) | MySQL 8.0 |
+| Relational DB (trading) | PostgreSQL 15 |
+| Cache | Redis 7 |
+| Transport internal | gRPC + Protobuf |
+| Transport public | REST (gorilla/mux) + WebSocket |
+| Config | Viper (YAML + env override) |
+| Logging | Uber Zap (JSON structured) |
+| ORM | GORM (PostgreSQL / MySQL) |
+| Observability | OpenTelemetry (tracing + metrics) |
+| Container | Docker / Docker Compose |
+| Orchestration | Kubernetes (manifests tại `infra/kubernetes/`) |
+
+---
+
+## 3. Cấu trúc thư mục
 
 ```text
-trading-platform/
-├── cmd/
-│   ├── api_gateway/        # Cổng giao tiếp cho Client gọi API
-│   ├── market_ingestor/    # Service kết nối Binance/XTB qua WebSocket/API -> đẩy vào Kafka
-│   ├── orders_service/     # Quản lý đặt lệnh, hủy lệnh
-│   └── accounts_service/   # Quản lý số dư, nạp/rút
+BackendDataPlatform/
+├── cmd/                        # Entry point của từng service
+│   ├── api/                    # REST + gRPC API public
+│   ├── api_gateway/            # API Gateway (HTTP + gRPC routes, wire)
+│   ├── ingestor/               # Thu thập dữ liệu từ Binance/XTB → Kafka
+│   ├── market_ingestor/        # Market ingestor (phiên bản cũ / song song)
+│   ├── query/                  # Query service (đọc từ streaming + batch)
+│   ├── realtime_gateway/       # WebSocket gateway cho client
+│   ├── redis_janitor/          # Dọn dẹp các key hết hạn trong Redis
+│   ├── stream_processor/       # Xử lý event từ Kafka → DB
+│   ├── streaming/              # Streaming service (cung cấp gRPC)
+│   └── history_writer/         # Ghi dữ liệu lịch sử (consumers + wire)
+│
 ├── internal/
-│   ├── pkg/                # Các thư viện dùng chung
-│   │   ├── config/         # Setup Viper
-│   │   ├── logger/         # Setup Zap
-│   │   └── database/       # Setup Gorm connection
-│   ├── orders/             # Source code của Order Service
-│   │   ├── domain/         # Entity & Interfaces
-│   │   ├── app/            # Use cases
-│   │   ├── adapter/        # Gorm Repositories, Kafka Publishers
-│   │   └── transport/      # Gin/Fiber/HTTP Handlers
-├── deploy/                 # Docker-compose, K8s manifests
-└── README.md
+│   ├── gateway/                # Domain: Gateway service
+│   │   ├── adapter/
+│   │   ├── app/
+│   │   ├── contracts/
+│   │   └── transport/http/
+│   ├── marketdata/             # Domain: Market Data service
+│   │   ├── domain/             # Entities, Value Objects, Aggregates, Events
+│   │   ├── application/        # Use Cases, DTOs, Input/Output Ports
+│   │   ├── adapter/            # Repo implementations, Kafka publisher
+│   │   ├── app/
+│   │   └── transport/          # HTTP handlers, gRPC services
+│   ├── platform/               # Shared infrastructure code
+│   │   ├── config/             # Viper setup
+│   │   ├── logging/            # Zap wrapper
+│   │   ├── observability/      # OpenTelemetry (tracing, metrics, logger)
+│   │   ├── messaging/kafka/    # Producer, Consumer, DLQ, Retry Policy, Codec
+│   │   ├── storage/            # PostgreSQL + Redis setup
+│   │   ├── idempotency/        # Middleware + store (Redis-backed)
+│   │   ├── outbox/             # Outbox pattern (claimer, relay, publisher)
+│   │   ├── transport/          # HTTP utils, gRPC helpers
+│   │   ├── workflow/           # Step runner với observability
+│   │   ├── runtime/            # App bootstrap, graceful shutdown, worker pool
+│   │   ├── errors/             # Centralized error types
+│   │   ├── integrations/
+│   │   │   ├── binance/        # Binance WebSocket client
+│   │   │   └── xtb/            # XTB JSON socket client
+│   │   └── testing/            # Test helpers
+│   └── sharedkernel/           # (Dự phòng)
+│
+├── api/                        # REST handlers (batch, market, signals)
+├── batch/                      # Python: fetch OHLCV, compute indicators (gRPC server)
+├── streaming/                  # Go: Kafka consumer → MySQL, gRPC server
+├── query/                      # Go: Query aggregator (streaming + batch + Redis)
+├── ingestor/                   # Go: Binance/XTB ingestor → Kafka
+│
+├── protobuf/                   # .proto definitions
+│   ├── market-data/
+│   ├── data-query/
+│   └── batch-data/
+│
+├── config/
+│   └── marketdata.yaml         # Config mẫu cho Market Data Service
+│
+├── migrations/                 # SQL migrations theo domain
+│   ├── marketdata/
+│   ├── orders/
+│   ├── accounts/
+│   └── shared/
+│
+├── infra/
+│   ├── docker/                 # Dockerfiles + data-platform-compose.yml
+│   ├── kubernetes/             # K8s deployments, services, ingress
+│   ├── migrations/             # DDL cho MySQL (market_ticker, orderbook, kline…)
+│   ├── messaging/              # Kafka, NATS configs
+│   ├── security/               # RBAC, TLS, secrets
+│   └── kafka-topics.sh         # Script tạo Kafka topics
+│
+├── tests/
+│   ├── chaos/                  # Chaos Engineering (network_delay, pod_kill)
+│   ├── load/k6/                # Load testing với k6
+│   ├── unit/                   # Unit tests (đang phát triển)
+│   └── intergration/           # Integration tests (đang phát triển)
+│
+├── docs/
+│   ├── architecture/           # ADR, principles
+│   └── runbooks/               # Incident runbooks (DB locks, Kafka lag, WebSocket)
+│
+├── Makefile                    # Các lệnh build, test, lint, docker
+├── buf.yaml / buf.gen.yml      # Buf config để generate proto
+├── go.mod / go.sum
+└── docker-compose.yml          # Compose đơn giản (dev nhanh)
 ```
 
 ---
 
-## 💻 4. Hướng Dẫn Chi Tiết Cho Fresher (Step-by-Step)
+## 4. Các Microservices
 
-Là Fresher, bạn hãy làm tuần tự theo các bước sau. Đừng bỏ cóc!
+| Service | Entry Point | Port | Mô tả |
+|---|---|---|---|
+| **ingestor** | `cmd/ingestor` | — | Kết nối Binance/XTB qua WebSocket, đẩy event vào Kafka |
+| **stream_processor** | `cmd/stream_processor` | — | Consumer Kafka, xử lý event, ghi vào MySQL |
+| **streaming** | `cmd/streaming` | gRPC :9092 | Cung cấp dữ liệu realtime qua gRPC |
+| **batch** | `batch/` (Python) | gRPC :9093 | Fetch OHLCV lịch sử, tính toán indicators |
+| **query** | `cmd/query` | gRPC :9091 | Tổng hợp từ streaming + batch + Redis cache |
+| **api** | `cmd/api` | REST :8090 / gRPC :9090 | API public cho client |
+| **realtime_gateway** | `cmd/realtime_gateway` | WS | WebSocket gateway cho client realtime |
+| **api_gateway** | `cmd/api_gateway` | HTTP + gRPC | API Gateway (routing, auth, idempotency) |
+| **history_writer** | `cmd/history_writer` | — | Ghi dữ liệu lịch sử từ Kafka vào DB |
+| **redis_janitor** | `cmd/redis_janitor` | — | Dọn dẹp key Redis hết hạn |
 
-### Bước 1: Chuẩn bị môi trường (Prerequisites)
-1. Cài đặt **Golang** (Phiên bản $\ge$ 1.21).
-2. Cài đặt **Docker & Docker Compose** (Bắt buộc để chạy Kafka, Postgres).
-3. Clone project:
+---
+
+## 5. Clean Architecture (4 Layer)
+
+Các domain service (`internal/marketdata`, `internal/gateway`) được tổ chức theo 4 layer. Quy tắc: **layer ngoài phụ thuộc vào layer trong, không chiều ngược lại**.
+
+```
+┌─────────────────────────────────────────────┐
+│  Transport  (HTTP handlers, gRPC services)  │  ← Nhận request từ bên ngoài
+├─────────────────────────────────────────────┤
+│  Adapter    (Repository impl, Kafka pub)    │  ← Giao tiếp DB, Kafka, ext API
+├─────────────────────────────────────────────┤
+│  Application (Use Cases, DTOs, Ports)       │  ← Điều phối business logic
+├─────────────────────────────────────────────┤
+│  Domain     (Entities, Value Objects,       │  ← Quy tắc nghiệp vụ thuần túy
+│              Aggregates, Domain Events)     │     Không import framework nào
+└─────────────────────────────────────────────┘
+```
+
+**Các thành phần Domain hiện tại (`internal/marketdata/domain`):**
+- **Value Objects:** `Symbol`, `Timeframe`, `Quote`
+- **Entities:** `Candle`, `Trade`, `OrderBook`
+- **Aggregates:** `Ticker`
+- **Domain Events:** `PriceUpdated`, `NewTrade`, `AlertTriggered`
+
+---
+
+## 6. Các Pattern Quan Trọng
+
+### Outbox Pattern
+Chống mất event khi service crash. Khi ghi dữ liệu vào DB, một record cũng được ghi đồng thời vào bảng `outbox` trong cùng transaction. Worker riêng (`outbox/relay.go`) đọc bảng outbox và publish lên Kafka.
+
+```
+[Write DB] ──┐ (1 transaction)
+[Write Outbox] ──┘
+              ↓
+    [Outbox Relay Worker] → Kafka
+```
+
+> Triển khai tại: [`internal/platform/outbox/`](internal/platform/outbox/)
+
+### Idempotency
+Mọi API thay đổi trạng thái đều có middleware kiểm tra `Idempotency-Key` trong Redis. Request trùng key sẽ trả lại kết quả cached thay vì xử lý lại.
+
+> Triển khai tại: [`internal/platform/idempotency/`](internal/platform/idempotency/)
+
+### Dead Letter Queue (DLQ)
+Các Kafka message không xử lý được sau N lần retry sẽ được đẩy vào topic DLQ riêng để phân tích sau.
+
+> Triển khai tại: [`internal/platform/messaging/kafka/dlq.go`](internal/platform/messaging/kafka/dlq.go)
+
+### Workflow Runner
+Chuỗi các bước (steps) xử lý được bọc trong `workflow.Runner` với observability tích hợp (tracing + metrics).
+
+> Triển khai tại: [`internal/platform/workflow/`](internal/platform/workflow/)
+
+---
+
+## 7. Hướng dẫn chạy Local
+
+### Prerequisites
+- **Go** ≥ 1.23
+- **Docker** + **Docker Compose**
+- **Python** ≥ 3.9 (cho batch service)
+- **buf** (cho generate protobuf — tuỳ chọn)
+
+### Bước 1: Clone và cài dependencies
+
 ```bash
-git clone https://github.com/your-repo/trading-platform.git
-cd trading-platform
+git clone https://github.com/HungphamLeo/BackendDataPlatform.git
+cd BackendDataPlatform
 go mod tidy
 ```
 
-### Bước 2: Khởi động Hạ Tầng (Infrastructure)
-Chúng ta sẽ dùng Docker Compose để dựng toàn bộ Postgres, Redis, Zookeeper và Kafka lên máy local[cite: 1].
+### Bước 2: Khởi động infrastructure
+
 ```bash
-# Di chuyển vào thư mục chứa cấu hình docker
-cd deploy
+# Dùng compose chính (đầy đủ stack: Kafka, MySQL, Redis, các services)
+make docker-compose-up
 
-# Khởi động ở chế độ background (-d)
-docker-compose up -d
+# Hoặc dùng compose đơn giản (chỉ infra, không build services)
+docker compose up -d
 
-# Kiểm tra xem các container đã chạy thành công chưa
-docker-compose ps
+# Kiểm tra trạng thái
+docker compose ps
 ```
 
-### Bước 3: Cấu hình hệ thống (Viper)
-Hệ thống sử dụng `viper` để đọc file `config.yaml`. Đảm bảo bạn đã copy file mẫu:
+### Bước 3: Tạo Kafka Topics
+
 ```bash
-cp config.example.yaml config.yaml
-```
-*Mở file `config.yaml` và kiểm tra thông tin chuỗi kết nối Database, Kafka Broker (thường là `localhost:9092`), và API Keys của Binance/XTB.*
-
-### Bước 4: Chạy Database Migrations (GORM)
-Dự án sử dụng tính năng AutoMigrate của `gorm` (hoặc các tool migration tương đương) để tạo bảng[cite: 1].
-Khi các service khởi động, GORM sẽ tự động đồng bộ struct model trong code thành table trong PostgreSQL.
-
-### Bước 5: Chạy thử các Microservices
-Mở các terminal khác nhau để chạy từng service:
-
-**Terminal 1: Khởi động API Gateway**
-```bash
-go run cmd/api_gateway/main.go
+make topics
+# Tương đương: bash infra/kafka-topics.sh localhost:9092
 ```
 
-**Terminal 2: Khởi động Market Ingestor (Kết nối Binance/XTB)**
+### Bước 4: Cấu hình
+
+Copy file cấu hình mẫu và chỉnh sửa theo môi trường:
+
 ```bash
-go run cmd/market_ingestor/main.go
-# Bạn sẽ thấy Log (Zap) in ra: "Connected to Binance WebSocket..."
+# Cho từng service (mỗi service có .env.sample riêng)
+cp ingestor/.env.sample ingestor/.env
+cp streaming/.env.sample streaming/.env
+cp batch/.env.sample batch/.env
+cp query/.env.sample query/.env
+cp api/.env.sample api/.env
 ```
 
-**Terminal 3: Khởi động Orders Service**
+Hoặc dùng file YAML cho market data service:
 ```bash
-go run cmd/orders_service/main.go
+# Chỉnh sửa config/marketdata.yaml
+# Điền BINANCE_SPOT_API_KEY, XTB_API_KEY, ... vào biến môi trường
+```
+
+### Bước 5: Chạy các services
+
+```bash
+# Terminal 1: Ingestor (Binance/XTB → Kafka)
+go run ./cmd/ingestor
+
+# Terminal 2: Stream Processor (Kafka → MySQL)
+go run ./cmd/stream_processor
+
+# Terminal 3: Streaming gRPC service
+go run ./cmd/streaming
+
+# Terminal 4: Batch Python service
+cd batch && pip install -r requirements.txt && python batch_grpc_server.py
+
+# Terminal 5: Query service
+go run ./cmd/query
+
+# Terminal 6: API public
+go run ./cmd/api
+
+# Terminal 7: Realtime WebSocket Gateway
+go run ./cmd/realtime_gateway
 ```
 
 ---
 
-## 🧪 5. Các Lệnh Code & Test Thường Dùng
+## 8. Lệnh Build & Test
 
-Là developer, bạn sẽ cần test code liên tục. Đây là bộ bí kíp lệnh dành cho bạn:
-
-### 5.1. Chạy Unit Test & Xem Độ Phủ (Coverage)
-Chạy toàn bộ test trong dự án và kiểm tra xem có phát hiện lỗi nào không:
 ```bash
-# Chạy tất cả các bài test
-go test -v ./...
+# Build tất cả binary Go
+make build-all
 
-# Chạy test và xuất báo cáo độ phủ code (Coverage)
-go test -coverprofile=coverage.out ./...
-go tool cover -html=coverage.out  # Mở báo cáo trên trình duyệt
+# Build từng service
+make build-ingestor
+make build-streaming
+make build-query
+make build-api
+
+# Chạy toàn bộ tests
+make test
+# Tương đương: go test ./...
+
+# Lint
+make lint
+# Tương đương: golangci-lint run ./...
+
+# Generate protobuf (Go)
+make proto-go
+
+# Generate protobuf (Python cho batch)
+make proto-py
+
+# Dừng toàn bộ stack
+make docker-compose-down
 ```
 
-### 5.2. Test API Bằng cURL (Hoặc Postman)
-Sau khi `api_gateway` chạy ở port `8080`, hãy thử đặt một lệnh mua[cite: 1]:
-```bash
-curl -X POST http://localhost:8080/api/v1/orders \
-  -H "Content-Type: application/json" \
-  -H "Idempotency-Key: req-12345" \
-  -d '{
-    "symbol": "BTCUSDT",
-    "side": "BUY",
-    "price": 65000,
-    "quantity": 0.1
-  }'
+### Binary output
+Sau `make build-*`, binary được đặt tại `bin/`:
 ```
-*Lưu ý: Header `Idempotency-Key` dùng để chống trùng lặp request. Nếu bạn gửi 2 lần cùng một Key, hệ thống (thông qua Redis) sẽ chỉ xử lý 1 lần và trả lại kết quả cũ[cite: 1].*
-
-### 5.3. Xem Log Của Hệ Thống (Zap)
-Vì chúng ta dùng `zap`, log in ra sẽ có cấu trúc JSON cực kỳ chi tiết, giúp bạn dễ dàng debug.
-Ví dụ một dòng log chuẩn:
-```json
-{"level":"info","ts":"2026-05-04T21:00:00Z","caller":"market_ingestor/binance.go:45","msg":"Received tick","symbol":"BTCUSDT","price":65050.5}
+bin/ingestor
+bin/streaming
+bin/query
+bin/api
 ```
 
 ---
 
-## 🧠 6. Bí Kíp Dành Cho Fresher Của Dự Án Này
+## 9. Cấu hình
 
-Để không bị bỡ ngỡ, hãy ghi nhớ 3 pattern xương sống sau:
+Hệ thống dùng **Viper** để đọc config. Độ ưu tiên: **biến môi trường** > **file YAML**.
 
-1. **Outbox Pattern (Chống mất data):** Khi user đặt lệnh, hệ thống lưu Order vào Database (bằng Gorm), ĐỒNG THỜI lưu một "Sự kiện" (Event) vào bảng Outbox trong cùng 1 Transaction[cite: 1]. Sẽ có một worker riêng đọc bảng Outbox và đẩy lên Kafka. Điều này đảm bảo dù ứng dụng có crash thì sự kiện vẫn không bị mất[cite: 1].
-2. **Idempotency (Chống click đúp):** Mọi API thay đổi trạng thái (như POST, PUT) đều cần middleware kiểm tra Redis xem `Idempotency-Key` đã được xử lý chưa trước khi gọi xuống Application layer[cite: 1].
-3. **Làm việc với GORM ở Adapter Layer:** Bạn tuyệt đối **không** được import `gorm.DB` vào các file ở thư mục `domain` hay `app`. Hãy định nghĩa một Interface (ví dụ: `OrderRepository`) ở Domain, và dùng Gorm để implement interface đó tại thư mục `adapter`[cite: 1].
+File cấu hình chính: [`config/marketdata.yaml`](config/marketdata.yaml)
+
+Các section quan trọng:
+
+| Section | Mô tả |
+|---|---|
+| `app` | Tên service, version, môi trường |
+| `http` | Host, port, timeouts của HTTP server |
+| `grpc` | Host, port, stream config của gRPC server |
+| `logging` | Level, format (json/console), output |
+| `database` | PostgreSQL DSN, pool settings |
+| `redis` | Redis host, pool, retry settings |
+| `kafka` | Brokers, consumer group, topic mapping |
+| `binance` | Spot + Futures: base URL, WS URL, API keys, symbols, rate limits |
+| `xtb` | WebSocket URL, credentials, symbols, rate limit |
+| `endpoints` | Path, rate limit, cache TTL của từng REST endpoint |
+
+**Biến môi trường bắt buộc khi chạy production:**
+```
+BINANCE_SPOT_API_KEY
+BINANCE_SPOT_SECRET_KEY
+BINANCE_FUTURES_API_KEY
+BINANCE_FUTURES_SECRET_KEY
+XTB_API_KEY
+XTB_PASSWORD
+```
+
+**Kafka Broker mặc định (local):** `localhost:9092`  
+**Kafka Topics:**
+```
+market-data.price-updated
+market-data.new-trade
+market-data.alert-triggered
+market-data.events
+```
 
 ---
-*Chúc bạn code vui vẻ! Đừng ngại đọc mã nguồn của các file `_test.go` để hiểu cách các functions hoạt động nhé. Thời gian + kiên trì + practice = thành công[cite: 1]. 🚀*
+
+## 10. Database Migrations
+
+### MySQL (cho streaming/ingestor service)
+Các file DDL tại `infra/migrations/` được mount vào MySQL container khi chạy Docker Compose:
+
+| File | Bảng |
+|---|---|
+| `001_market_ticker.up.sql` | `market_ticker` |
+| `002_market_orderbook.up.sql` | `market_orderbook` |
+| `003_market_kline.up.sql` | `market_kline` |
+| `004_historical_ohlcv.up.sql` | `historical_ohlcv` |
+| `005_indicator_result.up.sql` | `indicator_result` |
+
+### PostgreSQL (cho trading services)
+Migrations theo domain tại `migrations/`:
+```
+migrations/
+├── marketdata/
+├── orders/
+├── accounts/
+└── shared/
+```
+
+---
+
+## Tài liệu liên quan
+
+- [`docs/architecture/`](docs/architecture/) — Quyết định kiến trúc (ADR), nguyên tắc thiết kế
+- [`docs/runbooks/`](docs/runbooks/) — Xử lý sự cố: DB locks, Kafka lag, WebSocket
+- [`refactoring-summary.md`](refactoring-summary.md) — Tổng kết quá trình refactor Market Data Service
+- [`infra/kubernetes/`](infra/kubernetes/) — Kubernetes manifests (deployments, services, ingress)
+
+---
+
+*Module: `github.com/HungphamLeo/BackendDataPlatform` — Go 1.23*
