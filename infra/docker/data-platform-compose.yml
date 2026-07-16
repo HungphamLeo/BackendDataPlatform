@@ -1,0 +1,134 @@
+version: '3.9'
+
+services:
+  # ── Infrastructure ───────────────────────────────────────────────────────
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+    ports:
+      - "2181:2181"
+    restart: unless-stopped
+    networks: [platform]
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    depends_on: [zookeeper]
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    ports:
+      - "9092:9092"
+    restart: unless-stopped
+    networks: [platform]
+
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: data_platform
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./infra/migrations:/docker-entrypoint-initdb.d:ro
+    restart: unless-stopped
+    networks: [platform]
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks: [platform]
+
+  # ── Data Platform Services ───────────────────────────────────────────────
+  ingestor:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.golang
+      args:
+        CMD_PATH: ./cmd/ingestor
+    env_file: ./ingestor/.env.sample
+    environment:
+      REDIS_ADDR: redis:6379
+      KAFKA_BROKERS: kafka:9092
+    depends_on: [redis, kafka]
+    restart: unless-stopped
+    networks: [platform]
+
+  streaming:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.golang
+      args:
+        CMD_PATH: ./cmd/streaming
+    env_file: ./streaming/.env.sample
+    environment:
+      KAFKA_BROKERS: kafka:9092
+      MYSQL_DSN: root:password@tcp(mysql:3306)/data_platform?parseTime=true
+    ports:
+      - "9092:9092"
+    depends_on: [kafka, mysql]
+    restart: unless-stopped
+    networks: [platform]
+
+  batch:
+    build:
+      context: ./batch
+      dockerfile: ../infra/docker/Dockerfile.python
+    env_file: ./batch/.env.sample
+    environment:
+      MYSQL_DSN: mysql+mysqlconnector://root:password@mysql:3306/data_platform
+    ports:
+      - "9093:9093"
+    depends_on: [mysql]
+    restart: unless-stopped
+    networks: [platform]
+
+  query:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.golang
+      args:
+        CMD_PATH: ./cmd/query
+    env_file: ./query/.env.sample
+    environment:
+      REDIS_ADDR: redis:6379
+      STREAMING_GRPC_ADDR: streaming:9092
+      BATCH_GRPC_ADDR: batch:9093
+    ports:
+      - "9091:9091"
+    depends_on: [streaming, batch, redis]
+    restart: unless-stopped
+    networks: [platform]
+
+  api:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.golang
+      args:
+        CMD_PATH: ./cmd/api
+    env_file: ./api/.env.sample
+    environment:
+      QUERY_GRPC_ADDR: query:9091
+    ports:
+      - "8090:8090"   # REST
+      - "9090:9090"   # gRPC public
+    depends_on: [query]
+    restart: unless-stopped
+    networks: [platform]
+
+volumes:
+  mysql_data:
+  redis_data:
+
+networks:
+  platform:
+    driver: bridge
