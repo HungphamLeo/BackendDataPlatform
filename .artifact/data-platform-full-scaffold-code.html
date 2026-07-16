@@ -1,0 +1,53 @@
+
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Data Platform Scaffold</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, "Segoe UI", system-ui, sans-serif; font-size: 14px; line-height: 1.6; background: #ffffff; color: #1f2328; }
+  .header { background: #f7f8fa; border-bottom: 1px solid #e5e7eb; padding: 18px 24px; }
+  .header h1 { font-size: 18px; font-weight: 600; color: #1f2328; }
+  .header p { font-size: 13px; color: #57606a; margin-top: 4px; }
+  .layout { display: flex; height: calc(100vh - 74px); }
+  .sidebar { width: 220px; min-width: 220px; background: #f7f8fa; border-right: 1px solid #e5e7eb; overflow-y: auto; padding: 12px 0; }
+  .sidebar-group { margin-bottom: 4px; }
+  .sidebar-group-title { font-size: 11px; font-weight: 600; color: #57606a; text-transform: uppercase; letter-spacing: .05em; padding: 6px 16px 2px; }
+  .sidebar-item { display: block; width: 100%; text-align: left; background: none; border: none; cursor: pointer; padding: 5px 16px; font-size: 12.5px; color: #1f2328; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-left: 3px solid transparent; }
+  .sidebar-item:hover { background: #e5e7eb; }
+  .sidebar-item.active { background: #e5e7eb; border-left-color: #3b82d4; color: #3b82d4; font-weight: 600; }
+  .main { flex: 1; overflow-y: auto; padding: 0; }
+  .file-panel { display: none; flex-direction: column; height: 100%; }
+  .file-panel.active { display: flex; }
+  .file-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 20px; background: #f7f8fa; border-bottom: 1px solid #e5e7eb; flex-shrink: 0; }
+  .file-path { font-family: "SFMono-Regular", Consolas, monospace; font-size: 12px; color: #57606a; }
+  .file-lang { font-size: 11px; background: #e5e7eb; padding: 2px 8px; border-radius: 10px; color: #57606a; margin-left: 8px; }
+  .copy-btn { font-size: 12px; padding: 4px 12px; background: #3b82d4; color: #fff; border: none; border-radius: 5px; cursor: pointer; }
+  .copy-btn:hover { background: #2563b8; }
+  .copy-btn.copied { background: #16a34a; }
+  pre { flex: 1; overflow: auto; margin: 0; padding: 18px 20px; font-family: "SFMono-Regular", Consolas, monospace; font-size: 12.5px; line-height: 1.55; background: #ffffff; white-space: pre; tab-size: 2; }
+  .badge { display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 8px; margin-left: 6px; font-weight: 600; }
+  .badge-go { background: #dbeafe; color: #1e40af; }
+  .badge-py { background: #fef9c3; color: #854d0e; }
+  .badge-proto { background: #f3e8ff; color: #6b21a8; }
+  .badge-sql { background: #dcfce7; color: #166534; }
+  .badge-yaml { background: #fee2e2; color: #991b1b; }
+  .badge-sh { background: #f0fdf4; color: #15803d; }
+  footer { text-align: center; font-size: 11px; color: #57606a; padding: 10px; border-top: 1px solid #e5e7eb; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>BackendDataPlatform — Full Scaffold</h1>
+  <p>7 sub-tasks adapted from Financial_Trading codebase. Click a file in the sidebar → copy to your repo.</p>
+</div>
+<div class="layout">
+<nav class="sidebar" id="sidebar"></nav>
+<div class="main" id="main"></div>
+</div>
+<footer>Made with IBM Bob</footer>
+
+
+</body>
+</html>

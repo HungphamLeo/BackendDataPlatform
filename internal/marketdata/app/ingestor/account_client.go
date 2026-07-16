@@ -1,7 +1,9 @@
-// TODO: File này vi phạm Clean Architecture. 
+//go:build ignore
+
+// TODO: File này vi phạm Clean Architecture.
 // Cần di chuyển file này sang: internal/marketdata/adapter/provider/binance/rest/
 
-package rest
+package ignored
 
 import (
 	"context"

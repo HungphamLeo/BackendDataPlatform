@@ -1,0 +1,5 @@
+version: v1
+modules:
+  - path: protobuf/market-data
+  - path: protobuf/batch-data
+  - path: protobuf/data-query
